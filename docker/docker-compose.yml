@@ -1,0 +1,114 @@
+# docker-compose.yml
+# This docker-compose file sets up a local environment for running Ollama with LiteLLM as a proxy,
+# along with Chroma for vector storage and Neo4j for graph database storage.
+services:
+  # The Ollama service running the local LLM
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama_data:/root/.ollama
+    networks:
+      - rag_net
+
+    # GPU access via CDI (works with both Podman and Docker)
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: all
+    #           capabilities: [gpu]
+    devices:
+      - nvidia.com/gpu=all
+
+  # Helper service to pull models into the shared Ollama volume on startup
+  model-puller:
+    image: alpine/curl:latest
+    container_name: model-puller
+    depends_on:
+      - ollama
+    command: >
+      sh -c "
+        echo 'Waiting for Ollama to start...';
+        while ! curl -s http://ollama:11434 > /dev/null; do
+          sleep 1;
+        done;
+        echo 'Ollama is up! Pulling models...';
+        curl http://ollama:11434/api/pull -d '{ \"name\": \"llama3\" }';
+        echo 'Llama3 pulled.';
+        curl http://ollama:11434/api/pull -d '{ \"name\": \"all-minilm\" }';
+        echo 'All-MiniLM pulled.';
+        curl http://ollama:11434/api/pull -d '{ \"name\": \"phi3\" }';
+        echo 'Phi-3 pulled.';
+        curl http://ollama:11434/api/pull -d '{ \"name\": \"gemma:2b\" }';
+        echo 'Gemma:2b pulled.';
+        curl http://ollama:11434/api/pull -d '{ \"name\": \"qwen3:4b\" }';
+        echo 'qwen3 pulled.';
+        echo 'All models pulled. Exiting...';"
+    networks:
+      - rag_net
+    restart: on-failure
+
+  # The LiteLLM Proxy to mimic the Azure OpenAI API
+  litellm:
+    image: serhiimandrykin/litellm:latest
+    container_name: litellm-proxy
+    depends_on:
+      - ollama
+    ports:
+      - "4000:4000" # <-- PORT CHANGED to avoid conflict with Chroma
+    volumes:
+      - ./config.yaml:/config.yaml
+    networks:
+      - rag_net
+    command: ["--config", "/config.yaml", "--port", "4000"] # <-- PORT CHANGED
+    restart: always
+
+  # NEW: Chroma DB for vector storage
+  # chroma-db:
+  #   image: chromadb/chroma:latest
+  #   container_name: chroma-db
+  #   ports:
+  #     - "8000:8000" # Chroma's default API port
+  #   volumes:
+  #     - chroma_data:/chroma/.chroma/
+  #   networks:
+  #     - rag_net
+  #   restart: always
+
+  # NEW: Neo4j for graph database storage
+  # neo4j:
+  #   image: neo4j:5.26
+  #   container_name: neo4j
+  #   ports:
+  #     - "7474:7474"   # HTTP
+  #     - "7687:7687"   # Bolt
+  #   environment:
+  #     NEO4J_AUTH: neo4j/gtghS3p2@25       # username/password
+  #     NEO4J_PLUGINS: '["apoc"]'       # ενεργοποίηση APOC
+  #     NEO4J_dbms_security_procedures_unrestricted: 'apoc.*'
+  #     NEO4J_dbms_security_procedures_allowlist: 'apoc.*'
+  #     NEO4J_dbms_connector_bolt_advertised__address: localhost:7687
+  #     NEO4J_dbms_connector_http_advertised__address: localhost:7474
+  #   volumes:
+  #     - neo4j_data:/data
+  #     - neo4j_logs:/logs
+  #     - neo4j_plugins:/plugins
+  #   networks:
+  #     - rag_net
+  #   restart: always
+
+volumes:
+  ollama_data:
+  # chroma_data: # Data persistence for Chroma
+  # neo4j_data:
+  # neo4j_logs:
+  # neo4j_plugins:
+
+
+networks:
+  rag_net: # Renamed network for clarity
+    driver: bridge
