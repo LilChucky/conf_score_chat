@@ -13,7 +13,10 @@ services:
     networks:
       - rag_net
 
-    # GPU access via CDI (works with both Podman and Docker)
+
+  # UNCOMMENT ONE OF THE FOLLOWING SECTIONS TO ENABLE GPU ACCESS
+
+    # GPU access (works with Docker)
     # deploy:
     #   resources:
     #     reservations:
@@ -21,8 +24,11 @@ services:
     #         - driver: nvidia
     #           count: all
     #           capabilities: [gpu]
-    devices:
-      - nvidia.com/gpu=all
+
+
+    # GPU access via CDI (works with Podman)
+    # devices:
+    #   - nvidia.com/gpu=all
 
   # Helper service to pull models into the shared Ollama volume on startup
   model-puller:
