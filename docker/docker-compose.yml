@@ -14,19 +14,17 @@ services:
       - rag_net
 
 
-  # UNCOMMENT ONE OF THE FOLLOWING SECTIONS TO ENABLE GPU ACCESS
-
-    # GPU access (works with Docker)
-    # deploy:
-    #   resources:
-    #     reservations:
-    #       devices:
-    #         - driver: nvidia
-    #           count: all
-    #           capabilities: [gpu]
 
 
-    # GPU access via CDI (works with Podman)
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+
     # devices:
     #   - nvidia.com/gpu=all
 
