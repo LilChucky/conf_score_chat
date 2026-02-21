@@ -49,3 +49,27 @@ DEFAULT_MODEL = "Phi-3"
 # Singleton config instances
 llm_config = LLMConfig()
 groq_config = GroqConfig()
+
+
+def get_chat_model(model_name: str = DEFAULT_MODEL, temperature: float | None = None):
+    """Return the appropriate LangChain chat model for the given model name."""
+    from langchain_openai import ChatOpenAI
+    from langchain_groq import ChatGroq
+
+    provider, model_id = AVAILABLE_MODELS.get(model_name, AVAILABLE_MODELS[DEFAULT_MODEL])
+
+    if provider == ModelProvider.LOCAL:
+        return ChatOpenAI(
+            model=model_id,
+            base_url=llm_config.base_url,
+            api_key=llm_config.api_key,
+            temperature=temperature or llm_config.default_temperature,
+        )
+    elif provider == ModelProvider.GROQ:
+        return ChatGroq(
+            model=model_id,
+            api_key=groq_config.api_key,
+            temperature=temperature or groq_config.default_temperature,
+        )
+    else:
+        raise ValueError(f"Unknown provider: {provider}")
